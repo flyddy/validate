@@ -73,6 +73,7 @@ class Validate
 
     /**
      * Validate constructor.
+     *
      * @throws Runtime
      */
     public function __construct()
@@ -139,13 +140,15 @@ class Validate
     /**
      * 添加一个待验证字段
      */
-    public function addColumn(string $name, ?string $alias = null, bool $reset = false): Rule
+    public function addColumn(string $name, ?string $alias = null, bool $reset = false, $errorMsg = "", $errorCnMsg = ""): Rule
     {
         if (!isset($this->columns[$name]) || $reset) {
-            $rule = new Rule();
+            $rule                 = new Rule();
             $this->columns[$name] = [
-                'alias' => $alias,
-                'rule' => $rule,
+                'alias'      => $alias,
+                'rule'       => $rule,
+                'errorMsg'   => $errorMsg,
+                'errorCnMsg' => $errorCnMsg,
             ];
         }
 
@@ -222,9 +225,9 @@ class Validate
                         $actionArgs[] = $arg;
                     } else {
                         // eg between:1,100
-                        $arg = explode(',', $arg);
+                        $arg        = explode(',', $arg);
                         $actionArgs = array_merge($actionArgs, $arg);
-//                        $actionArgs[] = $arg;
+                        //                        $actionArgs[] = $arg;
                     }
                 }
 
@@ -243,28 +246,32 @@ class Validate
 
     /**
      * 验证字段是否合法
+     *
      * @param array $data
+     *
      * @return bool
      * @throws Runtime
      */
     public function validate(array $data): bool
     {
         $this->verifiedData = [];
-        $spl = new SplArray($data);
-        $this->verifyData = $spl;
+        $spl                = new SplArray($data);
+        $this->verifyData   = $spl;
 
         foreach ($this->columns as $column => $item) {
+            $errorMsg   = $item['errorMsg'] ?? '';
+            $errorCnMsg = $item['errorCnMsg'] ?? '';
             $columnData = $spl->get($column);
-            $ruleMap = $item['rule']->getRuleMap();
+            $ruleMap    = $item['rule']->getRuleMap();
             //多维数组
             if (strpos($column, '*') !== false && is_array($columnData)) {
                 foreach ($columnData as $datum) {
-                    if ($this->runRule($datum, $ruleMap, $column)) {
+                    if ($this->runRule($datum, $ruleMap, $column, $errorMsg, $errorCnMsg)) {
                         return false;
                     }
                 }
             } else {
-                if ($this->runRule($columnData, $ruleMap, $column)) {
+                if ($this->runRule($columnData, $ruleMap, $column, $errorMsg, $errorCnMsg)) {
                     return false;
                 }
             }
@@ -278,10 +285,11 @@ class Validate
      * @param $itemData
      * @param $rules
      * @param $column
+     *
      * @return null|Error
      * @throws Runtime
      */
-    private function runRule($itemData, $rules, $column): ?Error
+    private function runRule($itemData, $rules, $column, $errorMsg, $errorCnMsg): ?Error
     {
         if (isset($rules['optional']) && ($itemData === null || $itemData === '')) {
             return null;
@@ -303,7 +311,9 @@ class Validate
                     $rule,
                     $ruleConf['msg'],
                     $ruleConf['arg'],
-                    $this
+                    $this,
+                    $errorMsg,
+                    $errorCnMsg
                 );
 
                 return $this->error;
@@ -323,7 +333,8 @@ class Validate
 
     /**
      * @param AbstractValidateFunction $function
-     * @param bool $overlay 是否允许覆盖
+     * @param bool                     $overlay 是否允许覆盖
+     *
      * @return $this
      * @throws Runtime
      */
